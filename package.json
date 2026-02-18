@@ -1,0 +1,10 @@
+{
+  "name": "stocktracker-automation",
+  "version": "1.0.0",
+  "scripts": {
+    "record": "node scripts/daily-record.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.0"
+  }
+}
