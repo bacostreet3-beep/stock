@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockTracker Pro - 雲端股票記錄</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        /* 自定義捲軸 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="min-h-screen flex flex-col">
+    
+    <div v-if="!user" class="flex-grow flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl text-center max-w-md w-full border border-slate-700">
+            <h1 class="text-3xl font-bold mb-2 text-white">StockTracker Pro</h1>
+            <p class="text-slate-400 mb-8">您的跨裝置雲端股票管家</p>
+            <button @click="login" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                使用 Google 帳號登入
+            </button>
+            <p class="mt-4 text-xs text-slate-500">資料將安全儲存於您的個人 Firebase 資料庫</p>
+        </div>
+    </div>
+
+    <div v-else class="flex flex-col h-screen">
+        <nav class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold">
+                    {{ user.displayName ? user.displayName[0] : 'U' }}
+                </div>
+                <span class="font-semibold hidden sm:inline">{{ user.displayName }}</span>
+            </div>
+            <div class="flex gap-3">
+                 <button @click="showAddModal = true" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-4 rounded-lg transition flex items-center gap-1">
+                    <span>+ 記帳</span>
+                </button>
+                <button @click="logout" class="bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-4 rounded-lg transition">
+                    登出
+                </button>
+            </div>
+        </nav>
+
+        <main class="flex-grow overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto w-full">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                    <h3 class="text-slate-400 text-sm mb-1">總資產估值 (USD)</h3>
+                    <p class="text-2xl font-bold text-white">${{ formatNumber(totalPortfolioValueUSD) }}</p>
+                </div>
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                    <h3 class="text-slate-400 text-sm mb-1">總投入成本 (USD)</h3>
+                    <p class="text-2xl font-bold text-slate-300">${{ formatNumber(totalCostUSD) }}</p>
+                </div>
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                    <h3 class="text-slate-400 text-sm mb-1">總未實現損益 (USD)</h3>
+                    <p :class="`text-2xl font-bold ${totalUnrealizedPL >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">
+                        {{ totalUnrealizedPL >= 0 ? '+' : '' }}{{ formatNumber(totalUnrealizedPL) }}
+                        <span class="text-sm font-normal opacity-70">({{ ((totalUnrealizedPL/totalCostUSD)*100).toFixed(2) }}%)</span>
+                    </p>
+                    <p class="text-xs text-slate-500 mt-1">約 TWD {{ formatNumber(totalUnrealizedPL * 32) }} (匯率 32)</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div v-for="stock in portfolioList" :key="stock.ticker" class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg flex flex-col">
+                    <div class="p-5 border-b border-slate-700 flex justify-between items-start">
+                        <div>
+                            <h2 class="text-xl font-bold text-white">{{ stock.ticker }}</h2>
+                            <p class="text-xs text-slate-400">現價: ${{ stock.currentPrice }} (模擬)</p>
+                        </div>
+                        <div class="text-right">
+                            <p :class="`text-lg font-bold ${stock.profit >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">
+                                {{ stock.profit >= 0 ? '+' : '' }}{{ formatNumber(stock.profit) }}
+                            </p>
+                            <p class="text-xs text-slate-400">{{ stock.profitPercent }}%</p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-5 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="block text-slate-500 text-xs">持有股數</span>
+                            <span class="text-white font-mono">{{ stock.shares }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-slate-500 text-xs">平均成本</span>
+                            <span class="text-white font-mono">${{ formatNumber(stock.avgCost) }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-slate-500 text-xs">總成本</span>
+                            <span class="text-slate-300 font-mono">${{ formatNumber(stock.totalCost) }}</span>
+                        </div>
+                         <div>
+                            <span class="block text-slate-500 text-xs">市值</span>
+                            <span class="text-slate-300 font-mono">${{ formatNumber(stock.marketValue) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="h-32 w-full bg-slate-800/50 relative">
+                        <canvas :id="'chart-' + stock.ticker"></canvas>
+                    </div>
+
+                    <div class="border-t border-slate-700">
+                        <button @click="stock.showHistory = !stock.showHistory" class="w-full py-2 text-xs text-slate-400 hover:bg-slate-700 transition">
+                            {{ stock.showHistory ? '隱藏交易紀錄' : '查看交易紀錄' }}
+                        </button>
+                        <div v-if="stock.showHistory" class="bg-slate-900/50 p-4 max-h-40 overflow-y-auto">
+                            <table class="w-full text-xs text-left text-slate-400">
+                                <thead>
+                                    <tr class="border-b border-slate-700">
+                                        <th class="pb-1">日期</th>
+                                        <th class="pb-1">動作</th>
+                                        <th class="pb-1">價格/比例</th>
+                                        <th class="pb-1">股數</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="t in stock.transactions" :key="t.id" class="border-b border-slate-800 last:border-0">
+                                        <td class="py-1">{{ t.date }}</td>
+                                        <td class="py-1">
+                                            <span :class="{
+                                                'text-rose-400': t.type === 'Buy',
+                                                'text-emerald-400': t.type === 'Sell',
+                                                'text-yellow-400': t.type === 'Split'
+                                            }">{{ formatType(t.type) }}</span>
+                                        </td>
+                                        <td class="py-1">{{ t.price }}</td>
+                                        <td class="py-1">{{ t.shares || '-' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="portfolioList.length === 0" class="text-center py-20 text-slate-500">
+                <p>目前沒有持倉紀錄</p>
+                <p class="text-sm">點擊右上角「+ 記帳」開始第一筆投資</p>
+            </div>
+        </main>
+    </div>
+
+    <div v-if="showAddModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 border border-slate-700 shadow-2xl">
+            <h2 class="text-xl font-bold text-white mb-4">新增交易紀錄</h2>
+            
+            <form @submit.prevent="addTransaction" class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">日期</label>
+                    <input v-model="form.date" type="date" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">股票代號 (如 AAPL, TSLA)</label>
+                    <input v-model="form.ticker" type="text" required uppercase placeholder="AAPL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 outline-none uppercase">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">交易類型</label>
+                        <select v-model="form.type" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 outline-none">
+                            <option value="Buy">買入 (Buy)</option>
+                            <option value="Sell">賣出 (Sell)</option>
+                            <option value="Split">拆分 (Split)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">
+                            {{ form.type === 'Split' ? '拆分比例 (如 2 代表 1拆2)' : '單價 (Price)' }}
+                        </label>
+                        <input v-model.number="form.price" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 outline-none">
+                    </div>
+                </div>
+                <div v-if="form.type !== 'Split'">
+                    <label class="block text-xs text-slate-400 mb-1">股數 (Shares)</label>
+                    <input v-model.number="form.shares" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">備註</label>
+                    <input v-model="form.notes" type="text" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 outline-none">
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button type="button" @click="showAddModal = false" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition">取消</button>
+                    <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition">儲存紀錄</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+    import { createApp, ref, computed, watch, onMounted, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // ==========================================
+    // // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCZk3RnSKni0j16Aorj5y8XD-ZnGg0Cyb0",
+  authDomain: "fankestock.firebaseapp.com",
+  projectId: "fankestock",
+  storageBucket: "fankestock.firebasestorage.app",
+  messagingSenderId: "968164026194",
+  appId: "1:968164026194:web:6c5d50a957348f0a397c8b",
+  measurementId: "G-1GJR85ZR1X"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+    // ==========================================
+    const firebaseConfig = {
+        // 請將下方字串替換為您從 Firebase Console 複製的內容
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    // 初始化 Firebase
+    let app, auth, db;
+    try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+    } catch (e) {
+        console.error("Firebase 初始化失敗，請檢查 Config 是否填寫正確。", e);
+    }
+
+    createApp({
+        setup() {
+            // State
+            const user = ref(null);
+            const transactions = ref([]);
+            const showAddModal = ref(false);
+            const prices = ref({}); // 儲存現價
+            
+            // Form Data
+            const form = ref({
+                date: new Date().toISOString().split('T')[0],
+                ticker: '',
+                type: 'Buy',
+                price: 0,
+                shares: 0,
+                notes: ''
+            });
+
+            // Authentication
+            const login = async () => {
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    alert("登入失敗: " + error.message);
+                }
+            };
+
+            const logout = () => signOut(auth);
+
+            // Listen to Auth State & Transactions
+            onMounted(() => {
+                onAuthStateChanged(auth, (currentUser) => {
+                    user.value = currentUser;
+                    if (currentUser) {
+                        // 監聽該使用者的交易紀錄 (Real-time)
+                        const q = query(
+                            collection(db, `users/${currentUser.uid}/transactions`), 
+                            orderBy("date", "asc") // 依照日期排序
+                        );
+                        onSnapshot(q, (snapshot) => {
+                            transactions.value = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data()
+                            }));
+                        });
+                    } else {
+                        transactions.value = [];
+                    }
+                });
+            });
+
+            // Add Transaction
+            const addTransaction = async () => {
+                if (!user.value) return;
+                try {
+                    await addDoc(collection(db, `users/${user.value.uid}/transactions`), {
+                        date: form.value.date,
+                        ticker: form.value.ticker.toUpperCase(),
+                        type: form.value.type,
+                        price: form.value.price,
+                        shares: form.value.type === 'Split' ? null : form.value.shares,
+                        notes: form.value.notes,
+                        createdAt: serverTimestamp()
+                    });
+                    showAddModal.value = false;
+                    // Reset form (keep date)
+                    form.value.ticker = '';
+                    form.value.price = 0;
+                    form.value.shares = 0;
+                    form.value.notes = '';
+                } catch (e) {
+                    alert("儲存失敗: " + e.message);
+                }
+            };
+
+            // ==========================================
+            // 核心邏輯：計算持倉與損益
+            // ==========================================
+            const portfolioList = computed(() => {
+                const groups = {};
+
+                // 1. 分組
+                transactions.value.forEach(t => {
+                    if (!groups[t.ticker]) {
+                        groups[t.ticker] = { 
+                            ticker: t.ticker, 
+                            transactions: [], 
+                            shares: 0, 
+                            totalCost: 0, 
+                            avgCost: 0 
+                        };
+                        // 觸發抓取現價 (如果還沒抓過)
+                        if (!prices.value[t.ticker]) fetchPrice(t.ticker);
+                    }
+                    groups[t.ticker].transactions.push(t);
+                });
+
+                // 2. 計算每支股票的狀態
+                return Object.values(groups).map(stock => {
+                    // 依照日期排序確保計算順序正確
+                    stock.transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                    stock.transactions.forEach(t => {
+                        const p = parseFloat(t.price);
+                        const s = parseFloat(t.shares);
+
+                        if (t.type === 'Buy') {
+                            stock.totalCost += p * s;
+                            stock.shares += s;
+                        } else if (t.type === 'Sell') {
+                            // 賣出時減少股數，依比例減少總成本 (平均成本法)
+                            if (stock.shares > 0) {
+                                const ratio = s / stock.shares;
+                                stock.totalCost -= stock.totalCost * ratio;
+                                stock.shares -= s;
+                            }
+                        } else if (t.type === 'Split') {
+                            // 拆分：股數變更，總成本不變，平均成本自動降低
+                            // p 在這裡是拆分比例 (Ratio)
+                            stock.shares *= p;
+                        }
+                    });
+
+                    // 防止除以零
+                    stock.avgCost = stock.shares > 0 ? stock.totalCost / stock.shares : 0;
+                    
+                    // 獲取現價 (模擬或真實)
+                    stock.currentPrice = prices.value[stock.ticker] || 0;
+                    
+                    // 計算損益
+                    stock.marketValue = stock.shares * stock.currentPrice;
+                    stock.profit = stock.marketValue - stock.totalCost;
+                    stock.profitPercent = stock.totalCost > 0 ? ((stock.profit / stock.totalCost) * 100).toFixed(2) : 0;
+                    
+                    stock.showHistory = false; // UI 狀態
+                    
+                    // 渲染圖表
+                    nextTick(() => renderChart(stock.ticker));
+                    
+                    return stock;
+                }).filter(s => s.shares > 0.001); // 只顯示還有持股的
+            });
+
+            // 總資產計算
+            const totalPortfolioValueUSD = computed(() => portfolioList.value.reduce((acc, s) => acc + s.marketValue, 0));
+            const totalCostUSD = computed(() => portfolioList.value.reduce((acc, s) => acc + s.totalCost, 0));
+            const totalUnrealizedPL = computed(() => totalPortfolioValueUSD.value - totalCostUSD.value);
+
+            // ==========================================
+            // Mock Services (模擬 API)
+            // ==========================================
+            
+            // 模擬抓取現價
+            const fetchPrice = async (ticker) => {
+                // TODO: 若申請了 Alpha Vantage 等 API，請在此替換
+                // 模擬：產生 100~1000 之間的隨機價格
+                // 為了讓圖表看起來真實，我們給定一個基數，並加上隨機波動
+                if (prices.value[ticker]) return; // 已有就不抓
+                
+                // 模擬延遲
+                await new Promise(r => setTimeout(r, 500));
+                
+                // 隨機產生一個價格
+                const basePrice = Math.floor(Math.random() * 900) + 100; 
+                prices.value[ticker] = basePrice;
+            };
+
+            // 繪製圖表 (使用 Chart.js)
+            const renderChart = (ticker) => {
+                const ctx = document.getElementById('chart-' + ticker);
+                if (!ctx) return;
+                
+                // 如果該 canvas 已經有 chart 實例，先銷毀 (避免重複)
+                if (window['chartInstance_' + ticker]) {
+                    // 簡單處理：實際專案應妥善管理 Chart 實例
+                    return; 
+                }
+
+                // 產生 6 個月的模擬歷史數據
+                const labels = [];
+                const data = [];
+                let price = prices.value[ticker] || 100;
+                for (let i = 0; i < 30; i++) { // 30 個數據點模擬趨勢
+                    labels.push(i);
+                    // 隨機漫步
+                    price = price * (1 + (Math.random() - 0.5) * 0.1);
+                    data.push(price);
+                }
+
+                window['chartInstance_' + ticker] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            borderColor: data[data.length-1] >= data[0] ? '#f43f5e' : '#34d399', // 紅漲綠跌
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { display: false }, y: { display: false } },
+                        layout: { padding: 5 }
+                    }
+                });
+            };
+
+            // Helper
+            const formatNumber = (num) => {
+                return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+            
+            const formatType = (type) => {
+                const map = { 'Buy': '買入', 'Sell': '賣出', 'Split': '拆分' };
+                return map[type] || type;
+            }
+
+            return {
+                user, login, logout,
+                showAddModal, form, addTransaction,
+                portfolioList,
+                totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
+                formatNumber, formatType
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
