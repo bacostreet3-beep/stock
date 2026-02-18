@@ -23,11 +23,5 @@ jobs:
       - name: Run recording script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: npm run record
-        # ... 前面保持不變 ...
-      - name: Run recording script
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          # 新增這一行
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: npm run record
