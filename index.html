@@ -16,6 +16,7 @@
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         .loader { border-top-color: #3b82f6; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; }
     </style>
 </head>
 <body>
@@ -44,17 +45,24 @@
                 <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white">
                     {{ user.displayName ? user.displayName[0] : 'U' }}
                 </div>
-                <span class="font-semibold hidden sm:inline">{{ user.displayName }}</span>
+                <span class="font-semibold hidden sm:inline text-sm">{{ user.displayName }}</span>
             </div>
-            <div class="flex gap-2">
-                 <button @click="toggleAllCharts" class="bg-slate-700 hover:bg-slate-600 text-white text-xs py-2 px-3 rounded-lg transition">
-                    {{ isAllChartsExpanded ? '收合所有圖表' : '展開所有圖表' }}
+            
+            <div class="flex items-center gap-2">
+                <select v-model="sortBy" class="bg-slate-800 border border-slate-700 text-xs text-slate-300 py-2 pl-3 pr-8 rounded-lg outline-none focus:border-blue-500 transition">
+                    <option value="ticker">代號 A-Z</option>
+                    <option value="profit">獲利多 → 少</option>
+                    <option value="cost">投入高 → 低</option>
+                </select>
+
+                 <button @click="toggleAllCharts" class="hidden sm:block bg-slate-700 hover:bg-slate-600 text-white text-xs py-2 px-3 rounded-lg transition">
+                    {{ isAllChartsExpanded ? '收合圖表' : '展開圖表' }}
                 </button>
-                 <button @click="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-4 rounded-lg transition flex items-center gap-1">
-                    <span>+ 記帳</span>
+                 <button @click="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-4 rounded-lg transition">
+                    + 記帳
                 </button>
-                <button @click="logout" class="bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-4 rounded-lg transition">
-                    登出
+                <button @click="logout" class="bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-3 rounded-lg transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 </button>
             </div>
         </nav>
@@ -70,17 +78,17 @@
                     <p class="text-2xl font-bold text-slate-300">${{ formatNumber(totalCostUSD) }}</p>
                 </div>
                 <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-                    <h3 class="text-slate-400 text-sm mb-1">總未實現損益 (USD)</h3>
+                    <h3 class="text-slate-400 text-sm mb-1">未實現損益 (淨值)</h3>
                     <p :class="`text-2xl font-bold ${totalUnrealizedPL >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">
                         {{ totalUnrealizedPL >= 0 ? '+' : '' }}{{ formatNumber(totalUnrealizedPL) }}
                         <span v-if="totalCostUSD > 0" class="text-sm font-normal opacity-70">({{ ((totalUnrealizedPL/totalCostUSD)*100).toFixed(2) }}%)</span>
                     </p>
-                    <p class="text-xs text-slate-500 mt-1">約 TWD {{ formatNumber(totalUnrealizedPL * 32) }} (匯率 32)</p>
+                    <p class="text-[10px] text-slate-500 mt-1 uppercase">含交易手續費計算</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div v-for="stock in portfolioList" :key="stock.ticker" class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg flex flex-col">
+                <div v-for="stock in sortedPortfolioList" :key="stock.ticker" class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg flex flex-col">
                     <div class="p-5 border-b border-slate-700">
                         <div class="flex justify-between items-start mb-4">
                             <div>
@@ -99,10 +107,10 @@
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <button @click="quickRecord(stock.ticker, 'Buy')" class="flex-1 bg-slate-700/50 hover:bg-rose-900/40 text-rose-400 text-[10px] py-1 rounded border border-rose-900/30 transition">買入</button>
-                            <button @click="quickRecord(stock.ticker, 'Sell')" class="flex-1 bg-slate-700/50 hover:bg-emerald-900/40 text-emerald-400 text-[10px] py-1 rounded border border-emerald-900/30 transition">賣出</button>
-                            <button @click="quickRecord(stock.ticker, 'Dividend')" class="flex-1 bg-slate-700/50 hover:bg-blue-900/40 text-blue-400 text-[10px] py-1 rounded border border-blue-900/30 transition">利息</button>
-                            <button @click="quickRecord(stock.ticker, 'Split')" class="flex-1 bg-slate-700/50 hover:bg-amber-900/40 text-amber-400 text-[10px] py-1 rounded border border-amber-900/30 transition">拆分</button>
+                            <button @click="quickRecord(stock.ticker, 'Buy')" class="flex-1 bg-slate-700/50 hover:bg-rose-900/40 text-rose-400 text-[10px] py-1 rounded border border-rose-900/30 transition uppercase">Buy</button>
+                            <button @click="quickRecord(stock.ticker, 'Sell')" class="flex-1 bg-slate-700/50 hover:bg-emerald-900/40 text-emerald-400 text-[10px] py-1 rounded border border-emerald-900/30 transition uppercase">Sell</button>
+                            <button @click="quickRecord(stock.ticker, 'Dividend')" class="flex-1 bg-slate-700/50 hover:bg-blue-900/40 text-blue-400 text-[10px] py-1 rounded border border-blue-900/30 transition uppercase">Div</button>
+                            <button @click="quickRecord(stock.ticker, 'Split')" class="flex-1 bg-slate-700/50 hover:bg-amber-900/40 text-amber-400 text-[10px] py-1 rounded border border-amber-900/30 transition uppercase">Split</button>
                         </div>
                     </div>
                     
@@ -110,7 +118,7 @@
                         <div><span class="block text-slate-500 text-xs">持有股數</span><span class="text-white font-mono">{{ stock.shares }}</span></div>
                         <div><span class="block text-slate-500 text-xs">平均成本</span><span class="text-white font-mono">${{ formatNumber(stock.avgCost) }}</span></div>
                         <div><span class="block text-slate-500 text-xs">總成本</span><span class="text-slate-300 font-mono">${{ formatNumber(stock.totalCost) }}</span></div>
-                        <div><span class="block text-slate-500 text-xs">市值</span><span class="text-slate-300 font-mono">${{ formatNumber(stock.marketValue) }}</span></div>
+                        <div><span class="block text-slate-500 text-xs">當前市值</span><span class="text-slate-300 font-mono">${{ formatNumber(stock.marketValue) }}</span></div>
                     </div>
 
                     <div class="border-t border-slate-700/50">
@@ -119,45 +127,38 @@
                         </button>
                         <div v-show="chartVisibleState[stock.ticker]" class="h-48 w-full bg-slate-900/30 relative p-2 transition-all">
                             <canvas :id="'chart-' + stock.ticker"></canvas>
-                            <div v-if="(!stock.history || stock.history.length < 1)" class="absolute inset-0 flex items-center justify-center text-slate-500 text-xs pointer-events-none">
-                                <p>等待每日自動記帳資料累積...</p>
-                            </div>
                         </div>
                     </div>
 
                     <div class="border-t border-slate-700">
-                        <button @click="toggleHistory(stock.ticker)" class="w-full py-2 text-xs text-slate-400 hover:bg-slate-700 transition flex items-center justify-center gap-1">
-                            <span>{{ historyState[stock.ticker] ? '隱藏交易紀錄 ▲' : '查看交易紀錄 ▼' }}</span>
+                        <button @click="toggleHistory(stock.ticker)" class="w-full py-2 text-xs text-slate-400 hover:bg-slate-700 transition">
+                            {{ historyState[stock.ticker] ? '隱藏交易紀錄 ▲' : '查看交易紀錄 ▼' }}
                         </button>
                         
                         <div v-if="historyState[stock.ticker]" class="bg-slate-900/50 p-4 max-h-56 overflow-y-auto">
-                            <table class="w-full text-xs text-left text-slate-400">
+                            <table class="w-full text-[10px] text-left text-slate-400">
                                 <thead>
-                                    <tr class="border-b border-slate-700">
+                                    <tr class="border-b border-slate-700 text-slate-500">
                                         <th class="pb-2">日期</th>
                                         <th class="pb-2">動作</th>
-                                        <th class="pb-2">價格</th>
-                                        <th class="pb-2">股數</th>
+                                        <th class="pb-2">單價</th>
+                                        <th class="pb-2">費</th>
                                         <th class="pb-2 text-right">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="t in stock.transactions" :key="t.id" class="border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition">
-                                        <td class="py-2">{{ t.date }}</td>
+                                        <td class="py-2">{{ t.date.slice(5) }}</td>
                                         <td class="py-2">
-                                            <span :class="{'text-rose-400': t.type === 'Buy', 'text-emerald-400': t.type === 'Sell', 'text-yellow-400': t.type === 'Split', 'text-blue-400': t.type === 'Dividend'}">
+                                            <span :class="{'text-rose-400': t.type === 'Buy', 'text-emerald-400': t.type === 'Sell', 'text-blue-400': t.type === 'Dividend'}">
                                                 {{ formatType(t.type) }}
                                             </span>
                                         </td>
-                                        <td class="py-2">{{ t.price }}</td>
-                                        <td class="py-2">{{ t.shares || '-' }}</td>
+                                        <td class="py-2">${{ t.price }}</td>
+                                        <td class="py-2 text-slate-500">{{ t.fee ? '$' + t.fee : '-' }}</td>
                                         <td class="py-2 text-right flex justify-end gap-2">
-                                            <button @click="openModal(t)" class="text-blue-400 hover:text-blue-300 p-1">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                            </button>
-                                            <button @click="deleteTransaction(t.id)" class="text-red-400 hover:text-red-300 p-1">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            </button>
+                                            <button @click="openModal(t)" class="text-blue-400 hover:text-blue-300"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                                            <button @click="deleteTransaction(t.id)" class="text-red-400 hover:text-red-300"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -166,42 +167,39 @@
                     </div>
                 </div>
             </div>
-
-            <div v-if="portfolioList.length === 0" class="text-center py-20 text-slate-500">
-                <p>目前沒有持倉紀錄</p>
-                <p class="text-sm">點擊右上角「+ 記帳」開始第一筆投資</p>
-            </div>
         </main>
     </div>
 
     <div v-if="showModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
         <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 border border-slate-700 shadow-2xl">
-            <h2 class="text-xl font-bold text-white mb-4">{{ editingId ? '編輯交易紀錄' : '新增交易紀錄' }}</h2>
+            <h2 class="text-xl font-bold text-white mb-4">{{ editingId ? '編輯紀錄' : '新增紀錄' }}</h2>
             <form @submit.prevent="saveTransaction" class="space-y-4">
-                <div><label class="block text-xs text-slate-400 mb-1">日期</label><input v-model="form.date" type="date" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div>
-                <div><label class="block text-xs text-slate-400 mb-1">股票代號</label><input v-model="form.ticker" type="text" required placeholder="AAPL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white uppercase" oninput="this.value = this.value.toUpperCase()"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs text-slate-400 mb-1">日期</label><input v-model="form.date" type="date" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">代號</label><input v-model="form.ticker" type="text" required placeholder="AAPL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white uppercase"></div>
+                </div>
+                
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1">交易類型</label>
-                        <select v-model="form.type" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
-                            <option value="Buy">買入</option>
-                            <option value="Sell">賣出</option>
-                            <option value="Dividend">利息 (免費配股)</option>
-                            <option value="Split">拆分</option>
+                        <label class="block text-xs text-slate-400 mb-1">類型</label>
+                        <select v-model="form.type" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white">
+                            <option value="Buy">買入</option><option value="Sell">賣出</option><option value="Dividend">利息</option><option value="Split">拆分</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1">{{ form.type === 'Split' ? '比例' : (form.type === 'Dividend' ? '市價(參考)' : '單價') }}</label>
-                        <input v-model.number="form.price" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
+                        <label class="block text-xs text-slate-400 mb-1">單價 / 比例</label>
+                        <input v-model.number="form.price" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">股數</label>
-                    <input v-model.number="form.shares" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs text-slate-400 mb-1">股數</label><input v-model.number="form.shares" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">手續費 (USD)</label><input v-model.number="form.fee" type="number" step="any" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white" placeholder="0"></div>
                 </div>
+
                 <div class="flex gap-3 mt-6">
-                    <button type="button" @click="closeModal" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded">取消</button>
-                    <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">{{ editingId ? '更新' : '儲存' }}</button>
+                    <button type="button" @click="closeModal" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm transition">取消</button>
+                    <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition">儲存</button>
                 </div>
             </form>
         </div>
@@ -209,10 +207,10 @@
 </div>
 
 <script type="module">
-    import { createApp, ref, computed, onMounted, nextTick, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+    import { createApp, ref, computed, onMounted, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, updateDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCZk3RnSKni0j16Aorj5y8XD-ZnGg0Cyb0",
@@ -234,34 +232,28 @@
             const transactions = ref([]);
             const showModal = ref(false);
             const editingId = ref(null);
-            const chartInstances = {};
+            const sortBy = ref('ticker'); // 預設排序：代號
             
             const historyState = ref({});
-            const chartVisibleState = ref({}); // 圖表顯示狀態
-            const isAllChartsExpanded = ref(false); // 全域展開狀態
+            const chartVisibleState = ref({});
+            const isAllChartsExpanded = ref(false);
             const historyRecords = ref({});
+            const chartInstances = {};
 
             const form = ref({
                 date: new Date().toISOString().split('T')[0],
-                ticker: '', type: 'Buy', price: 0, shares: 0
+                ticker: '', type: 'Buy', price: 0, shares: 0, fee: 0
             });
 
             const formatNumber = (num) => {
-                if (num === undefined || num === null) return '0.00';
-                return Number(num).toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
+                if (!num) return '0.00';
+                return Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             };
 
-            const toggleHistory = (ticker) => {
-                historyState.value[ticker] = !historyState.value[ticker];
-            };
-
+            const toggleHistory = (ticker) => historyState.value[ticker] = !historyState.value[ticker];
             const toggleChart = (ticker) => {
                 chartVisibleState.value[ticker] = !chartVisibleState.value[ticker];
                 if (chartVisibleState.value[ticker]) {
-                    // 展開時需要重新觸發圖表繪製，避免寬度錯誤
                     const stock = portfolioList.value.find(s => s.ticker === ticker);
                     if (stock) nextTick(() => renderChart(stock));
                 }
@@ -269,35 +261,19 @@
 
             const toggleAllCharts = () => {
                 isAllChartsExpanded.value = !isAllChartsExpanded.value;
-                portfolioList.value.forEach(stock => {
-                    chartVisibleState.value[stock.ticker] = isAllChartsExpanded.value;
-                });
-                if (isAllChartsExpanded.value) {
-                    nextTick(() => {
-                        portfolioList.value.forEach(stock => renderChart(stock));
-                    });
-                }
+                portfolioList.value.forEach(s => chartVisibleState.value[s.ticker] = isAllChartsExpanded.value);
+                if (isAllChartsExpanded.value) nextTick(() => portfolioList.value.forEach(s => renderChart(s)));
             };
 
             const quickRecord = (ticker, type) => {
                 editingId.value = null;
-                form.value = {
-                    date: new Date().toISOString().split('T')[0],
-                    ticker: ticker,
-                    type: type,
-                    price: 0,
-                    shares: 0
-                };
+                form.value = { date: new Date().toISOString().split('T')[0], ticker, type, price: 0, shares: 0, fee: 0 };
                 showModal.value = true;
             };
 
             const login = async () => {
-                const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (error) { alert("登入失敗: " + error.message); }
+                try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { alert("登入失敗"); }
             };
-
             const logout = () => signOut(auth);
 
             onMounted(() => {
@@ -305,29 +281,23 @@
                     user.value = currentUser;
                     loading.value = false;
                     if (currentUser) {
-                        const q = query(collection(db, `users/${currentUser.uid}/transactions`), orderBy("date", "asc"));
-                        onSnapshot(q, (snapshot) => {
-                            transactions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        onSnapshot(query(collection(db, `users/${currentUser.uid}/transactions`), orderBy("date", "asc")), (s) => {
+                            transactions.value = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         });
-                        
-                        const historyQ = collection(db, `users/${currentUser.uid}/price_history`);
-                        onSnapshot(historyQ, (snapshot) => {
-                            const records = {};
-                            snapshot.docs.forEach(doc => {
-                                records[doc.id] = doc.data().history || [];
-                            });
-                            historyRecords.value = records;
+                        onSnapshot(collection(db, `users/${currentUser.uid}/price_history`), (s) => {
+                            const recs = {};
+                            s.docs.forEach(d => recs[d.id] = d.data().history || []);
+                            historyRecords.value = recs;
                         });
                     }
                 });
             });
 
+            // 持倉計算邏輯
             const portfolioList = computed(() => {
                 const groups = {};
                 transactions.value.forEach(t => {
-                    if (!groups[t.ticker]) {
-                        groups[t.ticker] = { ticker: t.ticker, transactions: [], shares: 0, totalCost: 0 };
-                    }
+                    if (!groups[t.ticker]) groups[t.ticker] = { ticker: t.ticker, transactions: [], shares: 0, totalCost: 0 };
                     groups[t.ticker].transactions.push(t);
                 });
 
@@ -338,27 +308,25 @@
                     stock.transactions.forEach(t => {
                         const p = parseFloat(t.price);
                         const s = parseFloat(t.shares);
+                        const f = parseFloat(t.fee || 0); // 取出手續費
+
                         if (t.type === 'Buy') { 
-                            stock.totalCost += p * s; 
+                            stock.totalCost += (p * s) + f; // 買入：加上手續費
                             stock.shares += s; 
                         }
                         else if (t.type === 'Sell' && stock.shares > 0) {
                             const ratio = s / stock.shares;
-                            stock.totalCost -= stock.totalCost * ratio;
+                            // 賣出：按比例減少成本，並將該次手續費併入「未收回成本」中計算損益
+                            stock.totalCost = (stock.totalCost * (1 - ratio)) + f;
                             stock.shares -= s;
                         }
-                        else if (t.type === 'Split') { 
-                            stock.shares *= p; 
-                        }
-                        else if (t.type === 'Dividend') {
-                            // 利息邏輯：增加股數，但投入成本不變 (視為 $0 買入)
-                            stock.shares += s;
-                        }
+                        else if (t.type === 'Split') { stock.shares *= p; }
+                        else if (t.type === 'Dividend') { stock.shares += s; }
                     });
 
                     stock.avgCost = stock.shares > 0 ? stock.totalCost / stock.shares : 0;
-                    
                     stock.history = historyRecords.value[stock.ticker] || [];
+                    
                     if (stock.history.length > 0) {
                         const latest = [...stock.history].sort((a, b) => b.timestamp - a.timestamp)[0];
                         stock.currentPrice = latest.price;
@@ -372,12 +340,21 @@
                     stock.profit = stock.marketValue - stock.totalCost;
                     stock.profitPercent = stock.totalCost > 0 ? ((stock.profit / stock.totalCost) * 100).toFixed(2) : 0;
                     
-                    // 僅在圖表展開時繪製
-                    if (chartVisibleState.value[stock.ticker]) {
-                        nextTick(() => renderChart(stock));
-                    }
                     return stock;
                 }).filter(s => s.shares > 0.001);
+            });
+
+            // 核心功能：排序後的清單
+            const sortedPortfolioList = computed(() => {
+                const list = [...portfolioList.value];
+                if (sortBy.value === 'ticker') {
+                    list.sort((a, b) => a.ticker.localeCompare(b.ticker));
+                } else if (sortBy.value === 'profit') {
+                    list.sort((a, b) => b.profit - a.profit);
+                } else if (sortBy.value === 'cost') {
+                    list.sort((a, b) => b.totalCost - a.totalCost);
+                }
+                return list;
             });
 
             const totalPortfolioValueUSD = computed(() => portfolioList.value.reduce((acc, s) => acc + s.marketValue, 0));
@@ -385,88 +362,55 @@
             const totalUnrealizedPL = computed(() => totalPortfolioValueUSD.value - totalCostUSD.value);
 
             const renderChart = (stock) => {
-                const canvasId = 'chart-' + stock.ticker;
-                const ctx = document.getElementById(canvasId);
+                const ctx = document.getElementById('chart-' + stock.ticker);
                 if (!ctx) return;
-                
                 if (chartInstances[stock.ticker]) chartInstances[stock.ticker].destroy();
 
                 const historyData = [...stock.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-                const labels = historyData.map(h => h.date);
-                const dataPoints = historyData.map(h => h.profit);
-
-                const lastProfit = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1] : 0;
-                const lineColor = lastProfit >= 0 ? '#fb7185' : '#34d399';
-                const areaColor = lastProfit >= 0 ? 'rgba(251, 113, 133, 0.1)' : 'rgba(52, 211, 153, 0.1)';
+                const lastProfit = historyData.length > 0 ? historyData[historyData.length - 1].profit : 0;
 
                 chartInstances[stock.ticker] = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: labels,
+                        labels: historyData.map(h => h.date),
                         datasets: [{
-                            label: '獲利 (USD)',
-                            data: dataPoints,
-                            borderColor: lineColor,
-                            backgroundColor: areaColor,
-                            borderWidth: 2,
-                            pointRadius: 2,
-                            fill: true,
-                            tension: 0.3
+                            data: historyData.map(h => h.profit),
+                            borderColor: lastProfit >= 0 ? '#fb7185' : '#34d399',
+                            backgroundColor: lastProfit >= 0 ? 'rgba(251,113,133,0.1)' : 'rgba(52,211,153,0.1)',
+                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, 
                         plugins: { legend: { display: false } },
-                        scales: {
-                            x: { display: true, ticks: { color: '#64748b', font: { size: 9 } } },
-                            y: { display: true, ticks: { color: '#94a3b8', font: { size: 9 } } }
-                        }
+                        scales: { x: { ticks: { color: '#475569', font: { size: 8 } } }, y: { ticks: { color: '#475569', font: { size: 8 } } } }
                     }
                 });
             };
 
-            const openModal = (transaction = null) => {
-                if (transaction) {
-                    editingId.value = transaction.id;
-                    form.value = { ...transaction };
-                } else {
-                    editingId.value = null;
-                    form.value = {
-                        date: new Date().toISOString().split('T')[0],
-                        ticker: '', type: 'Buy', price: 0, shares: 0
-                    };
-                }
+            const openModal = (t = null) => {
+                if (t) { editingId.value = t.id; form.value = { ...t }; }
+                else { editingId.value = null; form.value = { date: new Date().toISOString().split('T')[0], ticker: '', type: 'Buy', price: 0, shares: 0, fee: 0 }; }
                 showModal.value = true;
             };
 
-            const closeModal = () => {
-                showModal.value = false;
-                editingId.value = null;
-            };
-
             const saveTransaction = async () => {
+                const data = { ...form.value, ticker: form.value.ticker.toUpperCase(), fee: parseFloat(form.value.fee || 0) };
                 try {
-                    const data = { ...form.value, ticker: form.value.ticker.toUpperCase() };
-                    if (editingId.value) {
-                        await updateDoc(doc(db, `users/${user.value.uid}/transactions`, editingId.value), data);
-                    } else {
-                        await addDoc(collection(db, `users/${user.value.uid}/transactions`), { ...data, createdAt: serverTimestamp() });
-                    }
-                    closeModal();
-                } catch (e) { alert("儲存失敗: " + e.message); }
+                    if (editingId.value) await updateDoc(doc(db, `users/${user.value.uid}/transactions`, editingId.value), data);
+                    else await addDoc(collection(db, `users/${user.value.uid}/transactions`), { ...data, createdAt: serverTimestamp() });
+                    showModal.value = false;
+                } catch (e) { alert("儲存失敗"); }
             };
 
             const deleteTransaction = async (id) => {
-                if (!confirm("確定要刪除這筆交易紀錄嗎？")) return;
-                try { await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id)); } 
-                catch (e) { alert("刪除失敗: " + e.message); }
+                if (confirm("刪除紀錄？")) await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id));
             };
 
             return {
-                user, loading, login, logout, 
-                showModal, openModal, closeModal, form, saveTransaction, editingId,
-                portfolioList, totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
+                user, loading, login, logout, sortBy,
+                showModal, openModal, closeModal: () => showModal.value = false, form, saveTransaction, editingId,
+                sortedPortfolioList, portfolioList, totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
                 formatNumber, historyState, toggleHistory, deleteTransaction,
                 chartVisibleState, toggleChart, toggleAllCharts, isAllChartsExpanded, quickRecord,
                 formatType: (type) => ({'Buy':'買入','Sell':'賣出','Split':'拆分','Dividend':'利息'}[type])
