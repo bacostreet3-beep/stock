@@ -193,22 +193,35 @@
     createApp({
         setup() {
             const user = ref(null);
-            const loading = ref(true); // 新增載入狀態
+            const loading = ref(true);
             const transactions = ref([]);
             const showAddModal = ref(false);
             const prices = ref({});
-            const chartInstances = {}; // 管理圖表實例
+            const chartInstances = {};
 
             const form = ref({
                 date: new Date().toISOString().split('T')[0],
                 ticker: '', type: 'Buy', price: 0, shares: 0
             });
 
+            // --- 修正：補上 formatNumber 函式 ---
+            const formatNumber = (num) => {
+                if (num === undefined || num === null) return '0.00';
+                return Number(num).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            };
+            // ---------------------------------
+
             const login = async () => {
                 const provider = new GoogleAuthProvider();
                 try {
                     await signInWithPopup(auth, provider);
-                } catch (error) { alert("登入失敗: " + error.message); }
+                } catch (error) { 
+                    console.error("Login Error:", error);
+                    alert("登入失敗: " + error.message); 
+                }
             };
 
             const logout = () => signOut(auth);
@@ -216,7 +229,7 @@
             onMounted(() => {
                 onAuthStateChanged(auth, (currentUser) => {
                     user.value = currentUser;
-                    loading.value = false; // 檢查完畢，關閉載入中
+                    loading.value = false;
                     if (currentUser) {
                         const q = query(collection(db, `users/${currentUser.uid}/transactions`), orderBy("date", "asc"));
                         onSnapshot(q, (snapshot) => {
@@ -302,7 +315,8 @@
             return {
                 user, loading, login, logout, showAddModal, form, addTransaction,
                 portfolioList, totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
-                formatNumber, formatType: (type) => ({'Buy':'買入','Sell':'賣出','Split':'拆分'}[type])
+                formatNumber,
+                formatType: (type) => ({'Buy':'買入','Sell':'賣出','Split':'拆分'}[type])
             };
         }
     }).mount('#app');
