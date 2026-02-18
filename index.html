@@ -31,175 +31,183 @@
         <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl text-center max-w-md w-full border border-slate-700">
             <h1 class="text-3xl font-bold mb-2 text-white">StockTracker Pro</h1>
             <p class="text-slate-400 mb-8">您的跨裝置雲端股票管家</p>
-            <button @click="login" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2">
+            <button @click="login" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-sm sm:text-base">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
                 使用 Google 帳號登入
             </button>
-            <p class="mt-4 text-xs text-slate-500">資料將安全儲存於您的個人 Firebase 資料庫</p>
         </div>
     </div>
 
     <div v-else class="flex flex-col h-screen">
         <nav class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex justify-between items-center sticky top-0 z-50">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white">
+                <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white shadow-lg">
                     {{ user.displayName ? user.displayName[0] : 'U' }}
                 </div>
-                <span class="font-semibold hidden sm:inline text-sm">{{ user.displayName }}</span>
+                <span class="font-semibold hidden sm:inline text-xs">{{ user.displayName }}</span>
             </div>
             
             <div class="flex items-center gap-2">
-                <select v-model="sortBy" class="bg-slate-800 border border-slate-700 text-xs text-slate-300 py-2 pl-3 pr-8 rounded-lg outline-none focus:border-blue-500 transition">
+                <select v-model="sortBy" class="bg-slate-800 border border-slate-700 text-[10px] sm:text-xs text-slate-300 py-2 pl-2 pr-6 rounded-lg outline-none">
                     <option value="ticker">代號 A-Z</option>
                     <option value="profit">獲利多 → 少</option>
                     <option value="cost">投入高 → 低</option>
                 </select>
-
-                 <button @click="toggleAllCharts" class="hidden sm:block bg-slate-700 hover:bg-slate-600 text-white text-xs py-2 px-3 rounded-lg transition">
-                    {{ isAllChartsExpanded ? '收合圖表' : '展開圖表' }}
-                </button>
-                 <button @click="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-4 rounded-lg transition">
-                    + 記帳
-                </button>
-                <button @click="logout" class="bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-3 rounded-lg transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                </button>
+                <button @click="showGlobalHistory = true" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] sm:text-xs py-2 px-3 rounded-lg transition">全域紀錄</button>
+                <button @click="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] sm:text-xs py-2 px-3 rounded-lg transition font-bold">+ 記帳</button>
+                <button @click="logout" class="bg-slate-800 text-slate-400 p-2 rounded-lg hover:text-white transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></button>
             </div>
         </nav>
 
-        <main class="flex-grow overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto w-full">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <main class="flex-grow overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-                    <h3 class="text-slate-400 text-sm mb-1">總資產估值 (USD)</h3>
+                    <h3 class="text-slate-400 text-xs mb-1">總資產估值 (USD)</h3>
                     <p class="text-2xl font-bold text-white">${{ formatNumber(totalPortfolioValueUSD) }}</p>
                 </div>
                 <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-                    <h3 class="text-slate-400 text-sm mb-1">總投入成本 (USD)</h3>
+                    <h3 class="text-slate-400 text-xs mb-1">總投入成本 (USD)</h3>
                     <p class="text-2xl font-bold text-slate-300">${{ formatNumber(totalCostUSD) }}</p>
                 </div>
                 <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-                    <h3 class="text-slate-400 text-sm mb-1">未實現損益 (淨值)</h3>
+                    <h3 class="text-slate-400 text-xs mb-1">未實現損益</h3>
                     <p :class="`text-2xl font-bold ${totalUnrealizedPL >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">
                         {{ totalUnrealizedPL >= 0 ? '+' : '' }}{{ formatNumber(totalUnrealizedPL) }}
                         <span v-if="totalCostUSD > 0" class="text-sm font-normal opacity-70">({{ ((totalUnrealizedPL/totalCostUSD)*100).toFixed(2) }}%)</span>
                     </p>
-                    <p class="text-[10px] text-slate-500 mt-1 uppercase">含交易手續費計算</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div v-for="stock in sortedPortfolioList" :key="stock.ticker" class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg flex flex-col">
-                    <div class="p-5 border-b border-slate-700">
-                        <div class="flex justify-between items-start mb-4">
+            <section>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-bold text-slate-400 flex items-center gap-2">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full"></span> 正在持有的股票 ({{ activePortfolio.length }})
+                    </h2>
+                    <button @click="toggleAllCharts" class="text-[10px] text-blue-400 hover:underline">一鍵開關圖表</button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div v-for="stock in activePortfolio" :key="stock.ticker" class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-xl flex flex-col">
+                        <div class="p-5 border-b border-slate-700 flex justify-between items-start">
                             <div>
                                 <h2 class="text-xl font-bold text-white">{{ stock.ticker }}</h2>
-                                <p class="text-xs text-slate-400">
-                                    現價: ${{ stock.currentPrice }} 
-                                    <span v-if="stock.isRealData" class="text-emerald-500 text-[10px] ml-1 font-bold">● 真實數據</span>
-                                    <span v-else class="text-amber-500 text-[10px] ml-1">● 同步中</span>
-                                </p>
+                                <p class="text-xs text-slate-400">現價: ${{ stock.currentPrice }} <span v-if="stock.isRealData" class="text-emerald-500 ml-1">● 真實</span></p>
                             </div>
                             <div class="text-right">
-                                <p :class="`text-lg font-bold ${stock.profit >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">
-                                    {{ stock.profit >= 0 ? '+' : '' }}{{ formatNumber(stock.profit) }}
-                                </p>
+                                <p :class="`text-lg font-bold ${stock.profit >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">{{ stock.profit >= 0 ? '+' : '' }}{{ formatNumber(stock.profit) }}</p>
                                 <p class="text-xs text-slate-400">{{ stock.profitPercent }}%</p>
                             </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button @click="quickRecord(stock.ticker, 'Buy')" class="flex-1 bg-slate-700/50 hover:bg-rose-900/40 text-rose-400 text-[10px] py-1 rounded border border-rose-900/30 transition uppercase">Buy</button>
-                            <button @click="quickRecord(stock.ticker, 'Sell')" class="flex-1 bg-slate-700/50 hover:bg-emerald-900/40 text-emerald-400 text-[10px] py-1 rounded border border-emerald-900/30 transition uppercase">Sell</button>
-                            <button @click="quickRecord(stock.ticker, 'Dividend')" class="flex-1 bg-slate-700/50 hover:bg-blue-900/40 text-blue-400 text-[10px] py-1 rounded border border-blue-900/30 transition uppercase">Div</button>
-                            <button @click="quickRecord(stock.ticker, 'Split')" class="flex-1 bg-slate-700/50 hover:bg-amber-900/40 text-amber-400 text-[10px] py-1 rounded border border-amber-900/30 transition uppercase">Split</button>
+                        <div class="p-5 grid grid-cols-2 gap-4 text-xs">
+                            <div><span class="block text-slate-500">持有股數</span><span class="text-white font-mono text-sm">{{ stock.shares }}</span></div>
+                            <div><span class="block text-slate-500">平均成本</span><span class="text-white font-mono text-sm">${{ formatNumber(stock.avgCost) }}</span></div>
                         </div>
-                    </div>
-                    
-                    <div class="p-5 grid grid-cols-2 gap-4 text-sm">
-                        <div><span class="block text-slate-500 text-xs">持有股數</span><span class="text-white font-mono">{{ stock.shares }}</span></div>
-                        <div><span class="block text-slate-500 text-xs">平均成本</span><span class="text-white font-mono">${{ formatNumber(stock.avgCost) }}</span></div>
-                        <div><span class="block text-slate-500 text-xs">總成本</span><span class="text-slate-300 font-mono">${{ formatNumber(stock.totalCost) }}</span></div>
-                        <div><span class="block text-slate-500 text-xs">當前市值</span><span class="text-slate-300 font-mono">${{ formatNumber(stock.marketValue) }}</span></div>
-                    </div>
-
-                    <div class="border-t border-slate-700/50">
-                        <button @click="toggleChart(stock.ticker)" class="w-full py-2 text-[10px] text-slate-500 hover:text-slate-300 hover:bg-slate-700/30 transition flex items-center justify-center gap-1">
-                            {{ chartVisibleState[stock.ticker] ? '隱藏損益圖表 ▲' : '展開損益圖表 ▼' }}
-                        </button>
-                        <div v-show="chartVisibleState[stock.ticker]" class="h-48 w-full bg-slate-900/30 relative p-2 transition-all">
+                        <div class="px-5 pb-5 flex gap-2">
+                            <button @click="quickRecord(stock.ticker, 'Buy')" class="flex-1 py-1 text-[10px] bg-slate-700 text-rose-400 rounded border border-rose-900/30">買入</button>
+                            <button @click="quickRecord(stock.ticker, 'Sell')" class="flex-1 py-1 text-[10px] bg-slate-700 text-emerald-400 rounded border border-emerald-900/30">賣出</button>
+                        </div>
+                        <div v-show="chartVisibleState[stock.ticker]" class="h-40 p-2 bg-slate-900/30 border-t border-slate-700/50">
                             <canvas :id="'chart-' + stock.ticker"></canvas>
                         </div>
-                    </div>
-
-                    <div class="border-t border-slate-700">
-                        <button @click="toggleHistory(stock.ticker)" class="w-full py-2 text-xs text-slate-400 hover:bg-slate-700 transition">
-                            {{ historyState[stock.ticker] ? '隱藏交易紀錄 ▲' : '查看交易紀錄 ▼' }}
+                        <button @click="toggleChart(stock.ticker)" class="py-1 text-[9px] text-slate-500 border-t border-slate-700/50 hover:bg-slate-700/30 transition">
+                            {{ chartVisibleState[stock.ticker] ? '隱藏損益圖 ▲' : '顯示損益圖 ▼' }}
                         </button>
-                        
-                        <div v-if="historyState[stock.ticker]" class="bg-slate-900/50 p-4 max-h-56 overflow-y-auto">
-                            <table class="w-full text-[10px] text-left text-slate-400">
-                                <thead>
-                                    <tr class="border-b border-slate-700 text-slate-500">
-                                        <th class="pb-2">日期</th>
-                                        <th class="pb-2">動作</th>
-                                        <th class="pb-2">單價</th>
-                                        <th class="pb-2">費</th>
-                                        <th class="pb-2 text-right">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="t in stock.transactions" :key="t.id" class="border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition">
-                                        <td class="py-2">{{ t.date.slice(5) }}</td>
-                                        <td class="py-2">
-                                            <span :class="{'text-rose-400': t.type === 'Buy', 'text-emerald-400': t.type === 'Sell', 'text-blue-400': t.type === 'Dividend'}">
-                                                {{ formatType(t.type) }}
-                                            </span>
-                                        </td>
-                                        <td class="py-2">${{ t.price }}</td>
-                                        <td class="py-2 text-slate-500">{{ t.fee ? '$' + t.fee : '-' }}</td>
-                                        <td class="py-2 text-right flex justify-end gap-2">
-                                            <button @click="openModal(t)" class="text-blue-400 hover:text-blue-300"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
-                                            <button @click="deleteTransaction(t.id)" class="text-red-400 hover:text-red-300"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
-                                        </td>
-                                    </tr>
-                                </tbody>
+                        <button @click="toggleHistory(stock.ticker)" class="py-2 text-xs text-slate-400 border-t border-slate-700 hover:bg-slate-700 transition">
+                            {{ historyState[stock.ticker] ? '收起詳細紀錄 ▲' : '查看詳細紀錄 ▼' }}
+                        </button>
+                        <div v-if="historyState[stock.ticker]" class="p-4 bg-slate-900/50 overflow-x-auto">
+                            <table class="w-full text-[10px] text-left">
+                                <tr class="text-slate-500 border-b border-slate-700"><th class="pb-1">日期</th><th>動作</th><th>單價</th><th>備註</th><th class="text-right">操作</th></tr>
+                                <tr v-for="t in stock.transactions" :key="t.id" class="border-b border-slate-800 last:border-0">
+                                    <td class="py-2">{{ t.date.slice(5) }}</td>
+                                    <td><span :class="{'text-rose-400': t.type === 'Buy', 'text-emerald-400': t.type === 'Sell'}">{{ formatType(t.type) }}</span></td>
+                                    <td>${{ t.price }}</td>
+                                    <td class="text-slate-400 max-w-[80px] truncate" :title="t.note">{{ t.note || '-' }}</td>
+                                    <td class="text-right flex justify-end gap-2">
+                                        <button @click="openModal(t)" class="text-blue-400">改</button>
+                                        <button @click="deleteTransaction(t.id)" class="text-red-400">刪</button>
+                                    </td>
+                                </tr>
                             </table>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
+
+            <section v-if="closedPortfolio.length > 0">
+                <h2 class="text-sm font-bold text-slate-500 flex items-center gap-2 mb-4">
+                    <span class="w-2 h-2 bg-slate-600 rounded-full"></span> 已結清紀錄 ({{ closedPortfolio.length }})
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-75">
+                    <div v-for="stock in closedPortfolio" :key="stock.ticker" class="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex justify-between items-center">
+                        <div>
+                            <p class="text-lg font-bold text-slate-300">{{ stock.ticker }}</p>
+                            <p class="text-[10px] text-slate-500">已結清</p>
+                        </div>
+                        <div class="text-right">
+                            <p :class="`font-bold ${stock.profit >= 0 ? 'text-rose-400' : 'text-emerald-400'}`">
+                                {{ stock.profit >= 0 ? '+' : '' }}{{ formatNumber(stock.profit) }}
+                            </p>
+                            <button @click="toggleHistory(stock.ticker)" class="text-[10px] text-blue-400 hover:underline">查看歷史紀錄</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
-    <div v-if="showModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div v-if="showGlobalHistory" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-slate-700 shadow-2xl">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-white">全域交易日誌</h2>
+                <button @click="showGlobalHistory = false" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex-grow overflow-y-auto p-4">
+                <table class="w-full text-xs sm:text-sm text-left">
+                    <thead class="text-slate-500 border-b border-slate-700 sticky top-0 bg-slate-800">
+                        <tr><th class="pb-2">日期</th><th>代號</th><th>動作</th><th>單價</th><th class="hidden sm:table-cell">備註</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        <tr v-for="t in globalTransactions" :key="t.id" class="hover:bg-slate-700/30">
+                            <td class="py-3 text-slate-400">{{ t.date }}</td>
+                            <td class="font-bold text-white">{{ t.ticker }}</td>
+                            <td><span :class="{'text-rose-400': t.type === 'Buy', 'text-emerald-400': t.type === 'Sell'}">{{ formatType(t.type) }}</span></td>
+                            <td class="font-mono">${{ t.price }}</td>
+                            <td class="hidden sm:table-cell text-slate-400 italic text-xs">{{ t.note || '-' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="showModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] p-4">
         <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 border border-slate-700 shadow-2xl">
-            <h2 class="text-xl font-bold text-white mb-4">{{ editingId ? '編輯紀錄' : '新增紀錄' }}</h2>
+            <h2 class="text-xl font-bold text-white mb-6">{{ editingId ? '修改紀錄' : '新增交易' }}</h2>
             <form @submit.prevent="saveTransaction" class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label class="block text-xs text-slate-400 mb-1">日期</label><input v-model="form.date" type="date" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">代號</label><input v-model="form.ticker" type="text" required placeholder="AAPL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white uppercase"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">日期</label><input v-model="form.date" type="date" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">代號</label><input v-model="form.ticker" type="text" required placeholder="AAPL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white uppercase"></div>
                 </div>
-                
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">類型</label>
-                        <select v-model="form.type" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white">
+                        <select v-model="form.type" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
                             <option value="Buy">買入</option><option value="Sell">賣出</option><option value="Dividend">利息</option><option value="Split">拆分</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">單價 / 比例</label>
-                        <input v-model.number="form.price" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white">
-                    </div>
+                    <div><label class="block text-xs text-slate-400 mb-1">單價/比例</label><input v-model.number="form.price" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div>
                 </div>
-
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label class="block text-xs text-slate-400 mb-1">股數</label><input v-model.number="form.shares" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">手續費 (USD)</label><input v-model.number="form.fee" type="number" step="any" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white" placeholder="0"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">股數</label><input v-model.number="form.shares" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">手續費</label><input v-model.number="form.fee" type="number" step="any" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div>
                 </div>
-
-                <div class="flex gap-3 mt-6">
-                    <button type="button" @click="closeModal" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm transition">取消</button>
-                    <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition">儲存</button>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">備註 (併購、分割原因等)</label>
+                    <textarea v-model="form.note" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-sm" placeholder="寫點什麼..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" @click="showModal = false" class="flex-1 py-2 bg-slate-700 text-white rounded text-sm hover:bg-slate-600">取消</button>
+                    <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-500 transition">儲存</button>
                 </div>
             </form>
         </div>
@@ -231,8 +239,9 @@
             const loading = ref(true);
             const transactions = ref([]);
             const showModal = ref(false);
+            const showGlobalHistory = ref(false); // 需求 2：全域紀錄開關
             const editingId = ref(null);
-            const sortBy = ref('ticker'); // 預設排序：代號
+            const sortBy = ref('ticker');
             
             const historyState = ref({});
             const chartVisibleState = ref({});
@@ -242,38 +251,31 @@
 
             const form = ref({
                 date: new Date().toISOString().split('T')[0],
-                ticker: '', type: 'Buy', price: 0, shares: 0, fee: 0
+                ticker: '', type: 'Buy', price: 0, shares: 0, fee: 0, note: ''
             });
 
-            const formatNumber = (num) => {
-                if (!num) return '0.00';
-                return Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            };
+            const formatNumber = (num) => !num ? '0.00' : Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             const toggleHistory = (ticker) => historyState.value[ticker] = !historyState.value[ticker];
             const toggleChart = (ticker) => {
                 chartVisibleState.value[ticker] = !chartVisibleState.value[ticker];
-                if (chartVisibleState.value[ticker]) {
-                    const stock = portfolioList.value.find(s => s.ticker === ticker);
-                    if (stock) nextTick(() => renderChart(stock));
-                }
+                if (chartVisibleState.value[ticker]) nextTick(() => renderChart(ticker));
             };
-
             const toggleAllCharts = () => {
                 isAllChartsExpanded.value = !isAllChartsExpanded.value;
-                portfolioList.value.forEach(s => chartVisibleState.value[s.ticker] = isAllChartsExpanded.value);
-                if (isAllChartsExpanded.value) nextTick(() => portfolioList.value.forEach(s => renderChart(s)));
+                allStocksCalculated.value.forEach(s => {
+                    chartVisibleState.value[s.ticker] = isAllChartsExpanded.value;
+                    if (isAllChartsExpanded.value) nextTick(() => renderChart(s.ticker));
+                });
             };
 
             const quickRecord = (ticker, type) => {
                 editingId.value = null;
-                form.value = { date: new Date().toISOString().split('T')[0], ticker, type, price: 0, shares: 0, fee: 0 };
+                form.value = { date: new Date().toISOString().split('T')[0], ticker, type, price: 0, shares: 0, fee: 0, note: '' };
                 showModal.value = true;
             };
 
-            const login = async () => {
-                try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { alert("登入失敗"); }
-            };
+            const login = async () => { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { alert("登入失敗"); } };
             const logout = () => signOut(auth);
 
             onMounted(() => {
@@ -293,8 +295,8 @@
                 });
             });
 
-            // 持倉計算邏輯
-            const portfolioList = computed(() => {
+            // 核心計算
+            const allStocksCalculated = computed(() => {
                 const groups = {};
                 transactions.value.forEach(t => {
                     if (!groups[t.ticker]) groups[t.ticker] = { ticker: t.ticker, transactions: [], shares: 0, totalCost: 0 };
@@ -306,17 +308,10 @@
                     stock.shares = 0; stock.totalCost = 0;
                     
                     stock.transactions.forEach(t => {
-                        const p = parseFloat(t.price);
-                        const s = parseFloat(t.shares);
-                        const f = parseFloat(t.fee || 0); // 取出手續費
-
-                        if (t.type === 'Buy') { 
-                            stock.totalCost += (p * s) + f; // 買入：加上手續費
-                            stock.shares += s; 
-                        }
+                        const p = parseFloat(t.price); const s = parseFloat(t.shares); const f = parseFloat(t.fee || 0);
+                        if (t.type === 'Buy') { stock.totalCost += (p * s) + f; stock.shares += s; }
                         else if (t.type === 'Sell' && stock.shares > 0) {
                             const ratio = s / stock.shares;
-                            // 賣出：按比例減少成本，並將該次手續費併入「未收回成本」中計算損益
                             stock.totalCost = (stock.totalCost * (1 - ratio)) + f;
                             stock.shares -= s;
                         }
@@ -326,76 +321,62 @@
 
                     stock.avgCost = stock.shares > 0 ? stock.totalCost / stock.shares : 0;
                     stock.history = historyRecords.value[stock.ticker] || [];
-                    
-                    if (stock.history.length > 0) {
-                        const latest = [...stock.history].sort((a, b) => b.timestamp - a.timestamp)[0];
-                        stock.currentPrice = latest.price;
-                        stock.isRealData = true;
-                    } else {
-                        stock.currentPrice = 0;
-                        stock.isRealData = false;
-                    }
-
+                    const latest = [...stock.history].sort((a, b) => b.timestamp - a.timestamp)[0];
+                    stock.currentPrice = latest ? latest.price : 0;
+                    stock.isRealData = !!latest;
                     stock.marketValue = stock.shares * stock.currentPrice;
                     stock.profit = stock.marketValue - stock.totalCost;
                     stock.profitPercent = stock.totalCost > 0 ? ((stock.profit / stock.totalCost) * 100).toFixed(2) : 0;
-                    
                     return stock;
-                }).filter(s => s.shares > 0.001);
+                });
             });
 
-            // 核心功能：排序後的清單
-            const sortedPortfolioList = computed(() => {
-                const list = [...portfolioList.value];
-                if (sortBy.value === 'ticker') {
-                    list.sort((a, b) => a.ticker.localeCompare(b.ticker));
-                } else if (sortBy.value === 'profit') {
-                    list.sort((a, b) => b.profit - a.profit);
-                } else if (sortBy.value === 'cost') {
-                    list.sort((a, b) => b.totalCost - a.totalCost);
-                }
+            // 需求 3：區分持有與結清
+            const activePortfolio = computed(() => {
+                let list = allStocksCalculated.value.filter(s => s.shares > 0.001);
+                if (sortBy.value === 'ticker') list.sort((a, b) => a.ticker.localeCompare(b.ticker));
+                else if (sortBy.value === 'profit') list.sort((a, b) => b.profit - a.profit);
+                else if (sortBy.value === 'cost') list.sort((a, b) => b.totalCost - a.totalCost);
                 return list;
             });
 
-            const totalPortfolioValueUSD = computed(() => portfolioList.value.reduce((acc, s) => acc + s.marketValue, 0));
-            const totalCostUSD = computed(() => portfolioList.value.reduce((acc, s) => acc + s.totalCost, 0));
+            const closedPortfolio = computed(() => allStocksCalculated.value.filter(s => s.shares <= 0.001));
+
+            // 需求 2：全域紀錄排序
+            const globalTransactions = computed(() => [...transactions.value].sort((a, b) => new Date(b.date) - new Date(a.date)));
+
+            const totalPortfolioValueUSD = computed(() => activePortfolio.value.reduce((acc, s) => acc + s.marketValue, 0));
+            const totalCostUSD = computed(() => activePortfolio.value.reduce((acc, s) => acc + s.totalCost, 0));
             const totalUnrealizedPL = computed(() => totalPortfolioValueUSD.value - totalCostUSD.value);
 
-            const renderChart = (stock) => {
-                const ctx = document.getElementById('chart-' + stock.ticker);
+            const renderChart = (ticker) => {
+                const ctx = document.getElementById('chart-' + ticker);
                 if (!ctx) return;
-                if (chartInstances[stock.ticker]) chartInstances[stock.ticker].destroy();
-
+                if (chartInstances[ticker]) chartInstances[ticker].destroy();
+                const stock = allStocksCalculated.value.find(s => s.ticker === ticker);
                 const historyData = [...stock.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-                const lastProfit = historyData.length > 0 ? historyData[historyData.length - 1].profit : 0;
-
-                chartInstances[stock.ticker] = new Chart(ctx, {
+                chartInstances[ticker] = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: historyData.map(h => h.date),
                         datasets: [{
                             data: historyData.map(h => h.profit),
-                            borderColor: lastProfit >= 0 ? '#fb7185' : '#34d399',
-                            backgroundColor: lastProfit >= 0 ? 'rgba(251,113,133,0.1)' : 'rgba(52,211,153,0.1)',
-                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2
+                            borderColor: stock.profit >= 0 ? '#fb7185' : '#34d399',
+                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 1
                         }]
                     },
-                    options: { 
-                        responsive: true, maintainAspectRatio: false, 
-                        plugins: { legend: { display: false } },
-                        scales: { x: { ticks: { color: '#475569', font: { size: 8 } } }, y: { ticks: { color: '#475569', font: { size: 8 } } } }
-                    }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: true, ticks: { font: { size: 8 } } } } }
                 });
             };
 
             const openModal = (t = null) => {
                 if (t) { editingId.value = t.id; form.value = { ...t }; }
-                else { editingId.value = null; form.value = { date: new Date().toISOString().split('T')[0], ticker: '', type: 'Buy', price: 0, shares: 0, fee: 0 }; }
+                else { editingId.value = null; form.value = { date: new Date().toISOString().split('T')[0], ticker: '', type: 'Buy', price: 0, shares: 0, fee: 0, note: '' }; }
                 showModal.value = true;
             };
 
             const saveTransaction = async () => {
-                const data = { ...form.value, ticker: form.value.ticker.toUpperCase(), fee: parseFloat(form.value.fee || 0) };
+                const data = { ...form.value, ticker: form.value.ticker.toUpperCase() };
                 try {
                     if (editingId.value) await updateDoc(doc(db, `users/${user.value.uid}/transactions`, editingId.value), data);
                     else await addDoc(collection(db, `users/${user.value.uid}/transactions`), { ...data, createdAt: serverTimestamp() });
@@ -403,14 +384,12 @@
                 } catch (e) { alert("儲存失敗"); }
             };
 
-            const deleteTransaction = async (id) => {
-                if (confirm("刪除紀錄？")) await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id));
-            };
+            const deleteTransaction = async (id) => { if (confirm("刪除紀錄？")) await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id)); };
 
             return {
-                user, loading, login, logout, sortBy,
-                showModal, openModal, closeModal: () => showModal.value = false, form, saveTransaction, editingId,
-                sortedPortfolioList, portfolioList, totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
+                user, loading, login, logout, sortBy, showGlobalHistory,
+                showModal, openModal, form, saveTransaction, editingId,
+                activePortfolio, closedPortfolio, globalTransactions, totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
                 formatNumber, historyState, toggleHistory, deleteTransaction,
                 chartVisibleState, toggleChart, toggleAllCharts, isAllChartsExpanded, quickRecord,
                 formatType: (type) => ({'Buy':'買入','Sell':'賣出','Split':'拆分','Dividend':'利息'}[type])
