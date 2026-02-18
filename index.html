@@ -14,8 +14,6 @@
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
-        
-        /* 載入動畫 */
         .loader { border-top-color: #3b82f6; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -49,7 +47,7 @@
                 <span class="font-semibold hidden sm:inline">{{ user.displayName }}</span>
             </div>
             <div class="flex gap-3">
-                 <button @click="showAddModal = true" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-4 rounded-lg transition flex items-center gap-1">
+                 <button @click="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-4 rounded-lg transition flex items-center gap-1">
                     <span>+ 記帳</span>
                 </button>
                 <button @click="logout" class="bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-4 rounded-lg transition">
@@ -105,26 +103,41 @@
                     </div>
 
                     <div class="border-t border-slate-700">
-                        <button @click="stock.showHistory = !stock.showHistory" class="w-full py-2 text-xs text-slate-400 hover:bg-slate-700 transition">
-                            {{ stock.showHistory ? '隱藏交易紀錄' : '查看交易紀錄' }}
+                        <button @click="toggleHistory(stock.ticker)" class="w-full py-2 text-xs text-slate-400 hover:bg-slate-700 transition flex items-center justify-center gap-1">
+                            <span>{{ historyState[stock.ticker] ? '隱藏交易紀錄' : '查看交易紀錄' }}</span>
+                            <span v-if="!historyState[stock.ticker]">▼</span>
+                            <span v-else>▲</span>
                         </button>
-                        <div v-if="stock.showHistory" class="bg-slate-900/50 p-4 max-h-40 overflow-y-auto">
+                        
+                        <div v-if="historyState[stock.ticker]" class="bg-slate-900/50 p-4 max-h-56 overflow-y-auto">
                             <table class="w-full text-xs text-left text-slate-400">
                                 <thead>
                                     <tr class="border-b border-slate-700">
-                                        <th class="pb-1">日期</th><th class="pb-1">動作</th><th class="pb-1">價格/比例</th><th class="pb-1">股數</th>
+                                        <th class="pb-2">日期</th>
+                                        <th class="pb-2">動作</th>
+                                        <th class="pb-2">價格</th>
+                                        <th class="pb-2">股數</th>
+                                        <th class="pb-2 text-right">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="t in stock.transactions" :key="t.id" class="border-b border-slate-800 last:border-0">
-                                        <td class="py-1">{{ t.date }}</td>
-                                        <td class="py-1">
+                                    <tr v-for="t in stock.transactions" :key="t.id" class="border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition">
+                                        <td class="py-2">{{ t.date }}</td>
+                                        <td class="py-2">
                                             <span :class="{'text-rose-400': t.type === 'Buy', 'text-emerald-400': t.type === 'Sell', 'text-yellow-400': t.type === 'Split'}">
                                                 {{ formatType(t.type) }}
                                             </span>
                                         </td>
-                                        <td class="py-1">{{ t.price }}</td>
-                                        <td class="py-1">{{ t.shares || '-' }}</td>
+                                        <td class="py-2">{{ t.price }}</td>
+                                        <td class="py-2">{{ t.shares || '-' }}</td>
+                                        <td class="py-2 text-right flex justify-end gap-2">
+                                            <button @click="openModal(t)" class="text-blue-400 hover:text-blue-300 p-1" title="編輯">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            </button>
+                                            <button @click="deleteTransaction(t.id)" class="text-red-400 hover:text-red-300 p-1" title="刪除">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -140,10 +153,10 @@
         </main>
     </div>
 
-    <div v-if="showAddModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div v-if="showModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
         <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 border border-slate-700 shadow-2xl">
-            <h2 class="text-xl font-bold text-white mb-4">新增交易紀錄</h2>
-            <form @submit.prevent="addTransaction" class="space-y-4">
+            <h2 class="text-xl font-bold text-white mb-4">{{ editingId ? '編輯交易紀錄' : '新增交易紀錄' }}</h2>
+            <form @submit.prevent="saveTransaction" class="space-y-4">
                 <div><label class="block text-xs text-slate-400 mb-1">日期</label><input v-model="form.date" type="date" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div>
                 <div><label class="block text-xs text-slate-400 mb-1">股票代號</label><input v-model="form.ticker" type="text" required placeholder="AAPL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white uppercase" oninput="this.value = this.value.toUpperCase()"></div>
                 <div class="grid grid-cols-2 gap-4">
@@ -163,8 +176,8 @@
                     <input v-model.number="form.shares" type="number" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button type="button" @click="showAddModal = false" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded">取消</button>
-                    <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">儲存</button>
+                    <button type="button" @click="closeModal" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded">取消</button>
+                    <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">{{ editingId ? '更新' : '儲存' }}</button>
                 </div>
             </form>
         </div>
@@ -175,7 +188,8 @@
     import { createApp, ref, computed, onMounted, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    // 引入 deleteDoc, updateDoc, doc
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCZk3RnSKni0j16Aorj5y8XD-ZnGg0Cyb0",
@@ -195,16 +209,17 @@
             const user = ref(null);
             const loading = ref(true);
             const transactions = ref([]);
-            const showAddModal = ref(false);
+            const showModal = ref(false);
+            const editingId = ref(null); // 追蹤正在編輯的 ID
             const prices = ref({});
             const chartInstances = {};
+            const historyState = ref({}); // 獨立管理每個股票的歷史紀錄開關狀態
 
             const form = ref({
                 date: new Date().toISOString().split('T')[0],
                 ticker: '', type: 'Buy', price: 0, shares: 0
             });
 
-            // --- 修正：補上 formatNumber 函式 ---
             const formatNumber = (num) => {
                 if (num === undefined || num === null) return '0.00';
                 return Number(num).toLocaleString('en-US', {
@@ -212,7 +227,11 @@
                     maximumFractionDigits: 2
                 });
             };
-            // ---------------------------------
+
+            // 控制歷史紀錄展開/收合
+            const toggleHistory = (ticker) => {
+                historyState.value[ticker] = !historyState.value[ticker];
+            };
 
             const login = async () => {
                 const provider = new GoogleAuthProvider();
@@ -243,7 +262,8 @@
                 const groups = {};
                 transactions.value.forEach(t => {
                     if (!groups[t.ticker]) {
-                        groups[t.ticker] = { ticker: t.ticker, transactions: [], shares: 0, totalCost: 0, showHistory: false };
+                        // 這裡不放 showHistory，改用 historyState 獨立控制
+                        groups[t.ticker] = { ticker: t.ticker, transactions: [], shares: 0, totalCost: 0 };
                         if (!prices.value[t.ticker]) fetchPrice(t.ticker);
                     }
                     groups[t.ticker].transactions.push(t);
@@ -305,17 +325,67 @@
                 });
             };
 
-            const addTransaction = async () => {
-                await addDoc(collection(db, `users/${user.value.uid}/transactions`), {
-                    ...form.value, ticker: form.value.ticker.toUpperCase(), createdAt: serverTimestamp()
-                });
-                showAddModal.value = false;
+            // 打開 Modal (新增或編輯)
+            const openModal = (transaction = null) => {
+                if (transaction) {
+                    // 編輯模式
+                    editingId.value = transaction.id;
+                    form.value = { ...transaction };
+                } else {
+                    // 新增模式
+                    editingId.value = null;
+                    form.value = {
+                        date: new Date().toISOString().split('T')[0],
+                        ticker: '', type: 'Buy', price: 0, shares: 0
+                    };
+                }
+                showModal.value = true;
+            };
+
+            const closeModal = () => {
+                showModal.value = false;
+                editingId.value = null;
+            };
+
+            // 儲存交易 (新增或更新)
+            const saveTransaction = async () => {
+                try {
+                    const data = {
+                        ...form.value,
+                        ticker: form.value.ticker.toUpperCase()
+                    };
+
+                    if (editingId.value) {
+                        // 更新現有資料
+                        await updateDoc(doc(db, `users/${user.value.uid}/transactions`, editingId.value), data);
+                    } else {
+                        // 新增資料
+                        await addDoc(collection(db, `users/${user.value.uid}/transactions`), {
+                            ...data,
+                            createdAt: serverTimestamp()
+                        });
+                    }
+                    closeModal();
+                } catch (e) {
+                    alert("儲存失敗: " + e.message);
+                }
+            };
+
+            // 刪除交易
+            const deleteTransaction = async (id) => {
+                if (!confirm("確定要刪除這筆交易紀錄嗎？此動作無法復原。")) return;
+                try {
+                    await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id));
+                } catch (e) {
+                    alert("刪除失敗: " + e.message);
+                }
             };
 
             return {
-                user, loading, login, logout, showAddModal, form, addTransaction,
+                user, loading, login, logout, 
+                showModal, openModal, closeModal, form, saveTransaction, editingId,
                 portfolioList, totalPortfolioValueUSD, totalCostUSD, totalUnrealizedPL,
-                formatNumber,
+                formatNumber, historyState, toggleHistory, deleteTransaction,
                 formatType: (type) => ({'Buy':'買入','Sell':'賣出','Split':'拆分'}[type])
             };
         }
