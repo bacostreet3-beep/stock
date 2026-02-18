@@ -98,8 +98,11 @@
                         <div><span class="block text-slate-500 text-xs">市值</span><span class="text-slate-300 font-mono">${{ formatNumber(stock.marketValue) }}</span></div>
                     </div>
 
-                    <div class="h-32 w-full bg-slate-800/50 relative">
+                    <div class="h-48 w-full bg-slate-800/50 relative p-2">
                         <canvas :id="'chart-' + stock.ticker"></canvas>
+                        <div v-if="(!stock.history || stock.history.length < 2)" class="absolute inset-0 flex items-center justify-center text-slate-500 text-xs pointer-events-none">
+                            <p>等待每日自動記帳資料累積...</p>
+                        </div>
                     </div>
 
                     <div class="border-t border-slate-700">
@@ -131,10 +134,10 @@
                                         <td class="py-2">{{ t.price }}</td>
                                         <td class="py-2">{{ t.shares || '-' }}</td>
                                         <td class="py-2 text-right flex justify-end gap-2">
-                                            <button @click="openModal(t)" class="text-blue-400 hover:text-blue-300 p-1" title="編輯">
+                                            <button @click="openModal(t)" class="text-blue-400 hover:text-blue-300 p-1">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                             </button>
-                                            <button @click="deleteTransaction(t.id)" class="text-red-400 hover:text-red-300 p-1" title="刪除">
+                                            <button @click="deleteTransaction(t.id)" class="text-red-400 hover:text-red-300 p-1">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                             </button>
                                         </td>
@@ -185,11 +188,10 @@
 </div>
 
 <script type="module">
-    import { createApp, ref, computed, onMounted, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+    import { createApp, ref, computed, onMounted, nextTick, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    // 引入 deleteDoc, updateDoc, doc
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, updateDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCZk3RnSKni0j16Aorj5y8XD-ZnGg0Cyb0",
@@ -210,10 +212,12 @@
             const loading = ref(true);
             const transactions = ref([]);
             const showModal = ref(false);
-            const editingId = ref(null); // 追蹤正在編輯的 ID
+            const editingId = ref(null);
             const prices = ref({});
             const chartInstances = {};
-            const historyState = ref({}); // 獨立管理每個股票的歷史紀錄開關狀態
+            const historyState = ref({});
+            // 這裡負責從 Firebase 載入機器人幫我們寫進去的資料
+            const historyRecords = ref({});
 
             const form = ref({
                 date: new Date().toISOString().split('T')[0],
@@ -228,7 +232,6 @@
                 });
             };
 
-            // 控制歷史紀錄展開/收合
             const toggleHistory = (ticker) => {
                 historyState.value[ticker] = !historyState.value[ticker];
             };
@@ -237,10 +240,7 @@
                 const provider = new GoogleAuthProvider();
                 try {
                     await signInWithPopup(auth, provider);
-                } catch (error) { 
-                    console.error("Login Error:", error);
-                    alert("登入失敗: " + error.message); 
-                }
+                } catch (error) { alert("登入失敗: " + error.message); }
             };
 
             const logout = () => signOut(auth);
@@ -254,6 +254,18 @@
                         onSnapshot(q, (snapshot) => {
                             transactions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         });
+                        
+                        // 這裡：讀取 price_history (機器人寫入的地方)
+                        const historyQ = collection(db, `users/${currentUser.uid}/price_history`);
+                        onSnapshot(historyQ, (snapshot) => {
+                            const records = {};
+                            snapshot.docs.forEach(doc => {
+                                // 格式: { AAPL: [ {date: '2026-02-18', profit: 100}, ... ] }
+                                const data = doc.data();
+                                records[doc.id] = data.history || [];
+                            });
+                            historyRecords.value = records;
+                        });
                     }
                 });
             });
@@ -262,7 +274,6 @@
                 const groups = {};
                 transactions.value.forEach(t => {
                     if (!groups[t.ticker]) {
-                        // 這裡不放 showHistory，改用 historyState 獨立控制
                         groups[t.ticker] = { ticker: t.ticker, transactions: [], shares: 0, totalCost: 0 };
                         if (!prices.value[t.ticker]) fetchPrice(t.ticker);
                     }
@@ -291,7 +302,12 @@
                     stock.profit = stock.marketValue - stock.totalCost;
                     stock.profitPercent = stock.totalCost > 0 ? ((stock.profit / stock.totalCost) * 100).toFixed(2) : 0;
                     
-                    nextTick(() => renderChart(stock.ticker));
+                    // 綁定歷史紀錄供圖表使用
+                    stock.history = historyRecords.value[stock.ticker] || [];
+
+                    // 注意：這裡移除了 checkAndRecordDaily，因為已經交給 GitHub Actions 了
+
+                    nextTick(() => renderChart(stock));
                     return stock;
                 }).filter(s => s.shares > 0.001);
             });
@@ -305,34 +321,81 @@
                 prices.value[ticker] = basePrice;
             };
 
-            const renderChart = (ticker) => {
-                const ctx = document.getElementById('chart-' + ticker);
+            const renderChart = (stock) => {
+                const ctx = document.getElementById('chart-' + stock.ticker);
                 if (!ctx) return;
-                if (chartInstances[ticker]) chartInstances[ticker].destroy();
+                if (chartInstances[stock.ticker]) chartInstances[stock.ticker].destroy();
 
-                const data = Array.from({length: 20}, () => Math.random() * 100 + 100);
-                chartInstances[ticker] = new Chart(ctx, {
+                const historyData = stock.history || [];
+                historyData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                const labels = historyData.map(h => h.date);
+                const dataPoints = historyData.map(h => h.profit);
+
+                const lastProfit = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1] : 0;
+                const lineColor = lastProfit >= 0 ? '#fb7185' : '#34d399';
+                const areaColor = lastProfit >= 0 ? 'rgba(251, 113, 133, 0.1)' : 'rgba(52, 211, 153, 0.1)';
+
+                chartInstances[stock.ticker] = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: data.map((_, i) => i),
+                        labels: labels,
                         datasets: [{
-                            data: data,
-                            borderColor: data[19] >= data[0] ? '#f43f5e' : '#34d399',
-                            borderWidth: 2, pointRadius: 0, fill: false, tension: 0.4
+                            label: '獲利 (USD)',
+                            data: dataPoints,
+                            borderColor: lineColor,
+                            backgroundColor: areaColor,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            fill: true,
+                            tension: 0.3
                         }]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `獲利: $${context.parsed.y.toFixed(2)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: { display: false, drawBorder: false },
+                                ticks: {
+                                    color: '#64748b',
+                                    maxTicksLimit: 5,
+                                    font: { size: 10 }
+                                }
+                            },
+                            y: {
+                                display: true,
+                                grid: { color: '#334155' },
+                                ticks: {
+                                    color: '#94a3b8',
+                                    callback: function(value) { return '$' + value; },
+                                    font: { size: 10 }
+                                }
+                            }
+                        }
+                    }
                 });
             };
 
-            // 打開 Modal (新增或編輯)
             const openModal = (transaction = null) => {
                 if (transaction) {
-                    // 編輯模式
                     editingId.value = transaction.id;
                     form.value = { ...transaction };
                 } else {
-                    // 新增模式
                     editingId.value = null;
                     form.value = {
                         date: new Date().toISOString().split('T')[0],
@@ -347,38 +410,22 @@
                 editingId.value = null;
             };
 
-            // 儲存交易 (新增或更新)
             const saveTransaction = async () => {
                 try {
-                    const data = {
-                        ...form.value,
-                        ticker: form.value.ticker.toUpperCase()
-                    };
-
+                    const data = { ...form.value, ticker: form.value.ticker.toUpperCase() };
                     if (editingId.value) {
-                        // 更新現有資料
                         await updateDoc(doc(db, `users/${user.value.uid}/transactions`, editingId.value), data);
                     } else {
-                        // 新增資料
-                        await addDoc(collection(db, `users/${user.value.uid}/transactions`), {
-                            ...data,
-                            createdAt: serverTimestamp()
-                        });
+                        await addDoc(collection(db, `users/${user.value.uid}/transactions`), { ...data, createdAt: serverTimestamp() });
                     }
                     closeModal();
-                } catch (e) {
-                    alert("儲存失敗: " + e.message);
-                }
+                } catch (e) { alert("儲存失敗: " + e.message); }
             };
 
-            // 刪除交易
             const deleteTransaction = async (id) => {
-                if (!confirm("確定要刪除這筆交易紀錄嗎？此動作無法復原。")) return;
-                try {
-                    await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id));
-                } catch (e) {
-                    alert("刪除失敗: " + e.message);
-                }
+                if (!confirm("確定要刪除這筆交易紀錄嗎？")) return;
+                try { await deleteDoc(doc(db, `users/${user.value.uid}/transactions`, id)); } 
+                catch (e) { alert("刪除失敗: " + e.message); }
             };
 
             return {
